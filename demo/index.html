@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minty web pet</title>
+    <link rel="stylesheet" href="../dist/minty.css" />
+    <style>
+      :root {
+        --canvas: #f5f3f0;
+        --side: #efebe6;
+        --fg: #1d1915;
+        --fg-2: #675e55;
+        --row: #e4ddd4;
+        color-scheme: light;
+      }
+      :root.dark {
+        --canvas: #251d15;
+        --side: #2a221b;
+        --fg: #f3eee8;
+        --fg-2: #baafa4;
+        --row: #3c352e;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--canvas);
+        color: var(--fg);
+        font: 14px/1.5 system-ui, sans-serif;
+      }
+      aside {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 40;
+        width: 248px;
+        padding: 16px 12px;
+        box-sizing: border-box;
+        background: var(--side);
+        box-shadow: inset -1px 0 0 rgb(60 40 20 / 0.08);
+        transition: width 0.2s ease;
+      }
+      aside.is-rail {
+        width: 64px;
+      }
+      aside span {
+        display: block;
+        height: 36px;
+        margin-bottom: 4px;
+        border-radius: 8px;
+        background: var(--row);
+      }
+      main {
+        padding: 32px 40px 32px 288px;
+        transition: padding-left 0.2s ease;
+      }
+      aside.is-rail + main {
+        padding-left: 104px;
+      }
+      button.demo {
+        margin-right: 8px;
+        padding: 6px 12px;
+        border: 1px solid var(--row);
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      p {
+        max-width: 60ch;
+        color: var(--fg-2);
+      }
+    </style>
+  </head>
+  <body>
+    <aside id="menu"><span></span><span></span><span></span><span></span><span></span></aside>
+    <main>
+      <h1>Minty</h1>
+      <p>
+        Move the pointer near her, rub or click her head, poke her, drag and throw her, or drop her on the menu. The
+        small button over her head tucks her behind the menu; click her peeking face to call her back.
+      </p>
+      <button class="demo" id="rail">Fold menu</button>
+      <button class="demo" id="theme">Dark</button>
+      <button class="demo" id="toggle">Hide</button>
+    </main>
+    <script type="module">
+      import { createMinty } from '../dist/minty.js'
+      const menu = document.getElementById('menu')
+      const manifest = await (await fetch('../dist/minty.json')).json()
+      let state = {}
+      try {
+        state = JSON.parse(localStorage.getItem('minty.demo') || '{}')
+      } catch {}
+      const minty = await createMinty({
+        sheet: { avif: '../dist/minty.avif', webp: '../dist/minty.webp' },
+        manifest,
+        edge: () => menu.getBoundingClientRect().right,
+        state,
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        onChange: (next) => {
+          try {
+            localStorage.setItem('minty.demo', JSON.stringify(next))
+          } catch {}
+          toggle.textContent = next.hidden ? 'Call' : 'Hide'
+        },
+      })
+      window.minty = minty
+      const toggle = document.getElementById('toggle')
+      toggle.textContent = minty.hidden ? 'Call' : 'Hide'
+      toggle.onclick = () => (minty.hidden ? minty.summon() : minty.hide())
+      new ResizeObserver(() => minty.relayout()).observe(menu)
+      document.getElementById('rail').onclick = () => menu.classList.toggle('is-rail')
+      document.getElementById('theme').onclick = () => document.documentElement.classList.toggle('dark')
+    </script>
+  </body>
+</html>

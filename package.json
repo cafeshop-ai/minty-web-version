@@ -1,0 +1,18 @@
+{
+  "name": "minty-web-version",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minty, the Café Shop maid, as a small mouse-driven web pet",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "atlas": "node scripts/build-atlas.mjs",
+    "build": "esbuild src/minty.ts --bundle --format=esm --target=es2020 --minify --outfile=dist/minty.js && cp src/minty.css dist/minty.css",
+    "check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2",
+    "sharp": "0.34.5",
+    "typescript": "5.6.3"
+  }
+}
