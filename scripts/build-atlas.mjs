@@ -3,7 +3,7 @@
 //   -> dist/minty.avif, dist/minty.webp, dist/minty.json
 //
 // The Codex atlas is 8x11 cells of 192x208 for a desktop window. The web pet stands 56 CSS px tall, so it keeps
-// 29 of the 69 frames (breathing and hops are drawn in code instead), crops each frame to its own outline, scales
+// 35 of the 69 frames (breathing and bobbing are drawn in code instead), crops each frame to its own outline, scales
 // it to a common head size for 2x screens and packs the frames tightly. Every frame keeps the cell's foot point as
 // its anchor, so poses that crouch or lean stay where the source put them.
 import { createHash } from 'node:crypto'
@@ -30,10 +30,14 @@ const HEADS = {
   '5,1': 0.9, '5,2': 0.89, '5,3': 0.89, '5,4': 0.89, '5,6': 0.875,
   '8,0': 0.93, '8,2': 0.91,
   '7,0': 0.965, '7,2': 0.955,
+  // The walk (row 6, her only walk cycle, carrying a coffee tray) has a head about 13% smaller on a longer body, at
+  // the same height as idle. Scaled to her standing height: matched by the head, she would grow 15% as she walks.
+  '6,0': 1, '6,1': 1, '6,2': 1, '6,3': 1, '6,4': 1, '6,5': 1,
 }
 
-// [row, column] in the source atlas. The look-direction rows (9 and 10) and the coffee walk (row 6) are left out:
-// they are drawn with a smaller head on a longer body, so no single scale matches them to the other poses.
+// [row, column] in the source atlas. The look-direction rows (9 and 10) are left out: they are drawn with a smaller
+// head on a longer body and turn away. The drag rows (1 and 2) are one leaping pose with flying hair, so they serve
+// for being carried and thrown, and the walk comes from row 6. The walk faces left; the script mirrors it.
 const ANIMS = {
   idle: [[0, 0]],
   blink: [[0, 1]],
@@ -43,6 +47,7 @@ const ANIMS = {
   wave: [[3, 0], [3, 1], [3, 2], [3, 3]],
   dragRight: [[1, 0], [1, 2], [1, 4], [1, 6]],
   dragLeft: [[2, 0], [2, 2], [2, 4], [2, 6]],
+  walk: [[6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5]],
   sulk: [[5, 1], [5, 2], [5, 3], [5, 4], [5, 6]],
   happy: [[8, 0], [8, 2]],
   laptop: [[7, 0], [7, 2]],

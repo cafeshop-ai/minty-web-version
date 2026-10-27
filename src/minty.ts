@@ -3,12 +3,13 @@
 // She stands on the bottom of the window beside a "menu edge" (any vertical line the page names, usually a
 // sidebar). She notices the pointer, loves head pats (rub or click her head), waves when poked and sulks
 // when poked too often, struggles when dragged, falls and bounces when dropped or thrown, and fills quiet moments
-// with small idles. Hidden, she runs behind the menu edge and peeks out; a click on the peek, or summon(), makes her
-// duck in and run back out. Every move between places eases in and out; she never jumps. Timers stop while the tab
+// with small idles. Hidden, she walks behind the menu edge and peeks out; a click on the peek, or summon(), makes her
+// duck in and walk back out. Every move between places eases in and out; she never jumps, and a click or a pat
+// stops her on the way. Timers stop while the tab
 // is in the background, and the frame loop runs only while she moves.
 
 export type MintyFrame = [x: number, y: number, w: number, h: number, ax: number, ay: number]
-export type MintyAnim = 'idle' | 'blink' | 'smile' | 'notice' | 'pat' | 'wave' | 'dragRight' | 'dragLeft' | 'sulk' | 'happy' | 'laptop'
+export type MintyAnim = 'idle' | 'blink' | 'smile' | 'notice' | 'pat' | 'wave' | 'walk' | 'dragRight' | 'dragLeft' | 'sulk' | 'happy' | 'laptop'
 export interface MintyManifest {
   version: 1
   /** Atlas pixels per CSS pixel. */
@@ -57,9 +58,10 @@ const SIDE = 18 // half her standing width, plus a little air
 const HEAD = 0.42 // the top share of her height that counts as her head
 const NEAR = 200 // she notices a pointer closer than this
 const PEEK = 8 // hidden, how far her tucked outline reaches past the edge before she leans out
-const PACE = 0.14 // her running pace along the floor, px per ms
-const STRIDE = 20 // floor covered per running frame, px
-const FRAME = 130 // the shortest time a running, dragged or flying frame shows, ms
+const PACE = 0.045 // her walking pace, px per ms
+const STEP = 5.5 // floor covered per walking frame, px
+const AMBLE = 6000 // the longest walk, ms; further than that she walks briskly
+const FRAME = 130 // the shortest time a dragged or flying frame shows, ms
 const GRAVITY = 2600
 const NAP = 90_000 // no input for this long and she dozes off
 
@@ -74,17 +76,15 @@ const load = (src: string) =>
 const random = (min: number, max: number) => min + Math.random() * (max - min)
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const pingpong = (frames: number[]) => [...frames, ...frames.slice(1, -1).reverse()]
-// A run, as the share of the way covered at time t from 0 to 1: she speeds up over the first SPEED_UP of the time,
-// keeps her pace, and slows to a stop over the last SLOW_DOWN. `pace` is her speed then, as a share of full pace.
-const SPEED_UP = 0.22,
-  SLOW_DOWN = 0.3
-const glide = (t: number) => {
-  const v = 1 / (1 - SPEED_UP / 2 - SLOW_DOWN / 2)
-  if (t < SPEED_UP) return (v * t * t) / (2 * SPEED_UP)
-  if (t > 1 - SLOW_DOWN) return 1 - (v * (1 - t) ** 2) / (2 * SLOW_DOWN)
-  return v * (t - SPEED_UP / 2)
+// A walk, as the share of the way covered at time t from 0 to 1: she speeds up over the first share a of the time,
+// keeps her pace, and slows to a stop over the last share b. `pace` is her speed then, as a share of full pace.
+const glide = (t: number, a: number, b: number) => {
+  const v = 1 / (1 - a / 2 - b / 2)
+  if (t < a) return (v * t * t) / (2 * a)
+  if (t > 1 - b) return 1 - (v * (1 - t) ** 2) / (2 * b)
+  return v * (t - a / 2)
 }
-const pace = (t: number) => clamp(Math.min(t / SPEED_UP, (1 - t) / SLOW_DOWN), 0, 1)
+const pace = (t: number, a: number, b: number) => clamp(Math.min(t / a, (1 - t) / b), 0, 1)
 const ease = (t: number) => (1 - Math.cos(Math.PI * t)) / 2
 const heart = '<svg viewBox="0 0 10 9" aria-hidden="true"><path d="M5 9 1.1 5.2A2.6 2.6 0 0 1 5 1.7a2.6 2.6 0 0 1 3.9 3.5z"/></svg>'
 const tuck =
@@ -141,15 +141,18 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     body.style.transformOrigin = origin
     body.style.transform = `translate3d(${x - edge}px, ${y + hopY}px, 0)${tilt ? ` rotate(${tilt}deg)` : ''}`
   }
-  let frame = -1
-  const show = (index: number) => {
-    if (index === frame) return
+  // A frame, drawn as it is or mirrored about her feet.
+  let frame = -1,
+    mirrored = false
+  const show = (index: number, mirror = false) => {
+    if (index === frame && mirror === mirrored) return
     frame = index
+    mirrored = mirror
     const [fx, fy, w, h, ax, ay] = manifest.frames[index],
       s = sprite.style
     s.width = `${w / d}px`
     s.height = `${h / d}px`
-    s.transform = `translate(${-ax / d}px, ${-ay / d}px)`
+    s.transform = `${mirror ? 'scaleX(-1) ' : ''}translate(${-ax / d}px, ${-ay / d}px)`
     s.backgroundPosition = `${-fx / d}px ${-fy / d}px`
     // The hit area follows the pose: a pill as tall as the frame and a little narrower.
     const width = Math.min((w / d) * 0.72, 30),
@@ -233,9 +236,16 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     poseClass('is-dozing', false)
     poseClass('is-breathing', now === 'idle' || now === 'notice' || now === 'happy' || now === 'smile')
   }
+  // Where she was going when a click or a pat stopped her; she carries on once she has reacted.
+  let errand: (() => void) | null = null
   const idle = () => {
     stop()
     act('idle')
+    if (errand && standing()) {
+      const go = errand
+      errand = null
+      return go()
+    }
     show(anims.idle[0])
     scheduleIdle()
     scheduleBlink()
@@ -309,6 +319,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     }, 650)
   }
   const cheer = (ms: number) => {
+    if (mode === 'travel' && reachable()) pause()
     if (!standing() || activity === 'doze') return
     if (activity !== 'sulk') return pat(ms)
     puff('heart')
@@ -448,9 +459,12 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     })
   }
 
-  // Along the floor at a run, to hide, to come back or to step off the menu. She speeds up and slows down, and the
-  // running frames follow the floor she covers, so she neither skates nor runs on the spot.
-  let goal = 0
+  // Along the floor at an unhurried walk: to hide, to come back or to step off the menu. She eases into her first
+  // step and out of her last, and the frames follow the floor she covers, so her feet neither skate nor tread on the
+  // spot; a long way, she walks briskly rather than for ages. The drawn walk heads left; going right, it is mirrored.
+  // Out in the open, a press stops her (see `pause`).
+  let goal = 0,
+    walking: (() => void) | null = null
   const travel = (target: number, done: () => void) => {
     halt()
     stop()
@@ -464,26 +478,31 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     origin = '0px 0px'
     y = floor()
     goal = target
+    walking = () => travel(target, done)
     const from = x,
       distance = Math.abs(target - from),
-      run = target > from ? anims.dragRight : anims.dragLeft,
-      duration = calm || distance < 1 ? 0 : clamp(distance / PACE, 360, 3200),
+      mirror = target > from,
+      duration = calm || distance < 1 ? 0 : clamp(distance / PACE, 500, AMBLE),
+      // About a step to get going, and a little more to come to a stop.
+      a = Math.min(0.4, 380 / duration),
+      b = Math.min(0.45, 480 / duration),
       start = performance.now()
     let phase = 0,
       then = start
     const step = (now: number) => {
       const t = duration ? clamp((now - start) / duration, 0, 1) : 1,
-        next = t < 1 ? from + (target - from) * glide(t) : target
-      // A frame per stride of floor, but none shorter than FRAME: a long run glides a little instead.
-      phase += Math.min(Math.abs(next - x) / STRIDE, Math.max(0, now - then) / FRAME)
+        next = t < 1 ? from + (target - from) * glide(t, a, b) : target
+      // A frame per STEP of floor, but none shorter than 70 ms: walking briskly, she takes longer strides.
+      phase += Math.min(Math.abs(next - x) / STEP, Math.max(0, now - then) / 70)
       then = now
       x = next
-      if (duration) show(run[Math.floor(phase) % run.length])
-      // A small bob every second frame, as high as she is fast.
-      hopY = -Math.abs(Math.sin((phase * Math.PI) / 2)) * 3 * pace(t)
+      if (duration) show(anims.walk[Math.floor(phase) % anims.walk.length], mirror)
+      // A slight rise with each step.
+      hopY = -Math.abs(Math.sin((phase * Math.PI) / 3)) * 0.8 * pace(t, a, b)
       place()
       if (t < 1) return void (raf = requestAnimationFrame(step))
       raf = 0
+      walking = null
       hopY = 0
       place()
       done()
@@ -491,13 +510,27 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     if (!duration) return step(start)
     raf = requestAnimationFrame(step)
   }
+  // A press while she walks stops her where she is. She carries on once she has reacted (see `idle`), or gives up
+  // if carried off. Half behind the edge she is out of reach.
+  const reachable = () => !(stage.classList.contains('is-clipping') && x < left())
+  const pause = () => {
+    halt()
+    errand = walking
+    walking = null
+    mode = 'stand'
+    hopY = 0
+    show(anims.idle[0])
+    place()
+  }
 
   // Hidden: she stands behind the edge in her idle pose. `out` is how far she leans out, from 0, out of sight, to 1,
   // where her outline reaches PEEK past the edge and she leans so half her face and the bow show. It always eases,
   // so she ducks in and peeks out rather than jumping. The peek button covers her face; she smiles while it is hovered.
-  // How far frames reach right of her feet, and where she stands with them just out of sight behind the edge:
-  const reach = (frames: number[]) => Math.max(...frames.map((i) => (manifest.frames[i][2] - manifest.frames[i][4]) / d))
-  const behind = (frames: number[]) => edge - reach(frames) - 3
+  // How far frames, drawn as they are or mirrored, reach right of her feet, and where she stands with them just out of
+  // sight behind the edge:
+  const reach = (frames: number[], mirror: boolean) =>
+    Math.max(...frames.map((i) => (mirror ? manifest.frames[i][4] : manifest.frames[i][2] - manifest.frames[i][4]) / d))
+  const behind = (frames: number[], mirror = false) => edge - reach(frames, mirror) - 3
   let out = 0,
     lean = 13,
     leanTo = 13
@@ -534,6 +567,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     window.clearTimeout(idleTimer)
     window.clearTimeout(blinkTimer)
     window.clearInterval(patTimer)
+    errand = walking = null
     mode = 'hidden'
     activity = 'idle'
     stage.classList.add('is-hidden', 'is-clipping')
@@ -548,11 +582,11 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     dock(calm ? 1 : 0)
     if (!calm) later(() => peekTo(1, 650), 300)
   }
-  // To hide she runs behind the edge; from over the menu she first steps out beside it.
+  // To hide she walks behind the edge; from over the menu she first steps out beside it.
   const retreat = () => {
     if (!stage.classList.contains('is-clipping') && x < left()) return travel(left(), retreat)
     stage.classList.add('is-clipping')
-    travel(behind(anims.dragLeft), duck)
+    travel(behind(anims.walk), duck)
   }
   const hide = () => {
     if (hidden) return
@@ -561,16 +595,21 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     later(null)
     // Carried or falling, she hides once she is down.
     if (mode === 'drag' || mode === 'fall') return
-    stage.classList.add('is-hidden')
     // Ducking in to come out: she peeks again instead.
-    if (mode === 'hidden') return peekTo(1, 650)
+    if (mode === 'hidden') {
+      stage.classList.add('is-hidden')
+      return peekTo(1, 650)
+    }
     if (calm || mode === 'travel') return retreat()
+    // A wave goodbye, then off she goes.
+    errand = retreat
     act('wave')
-    play([...anims.wave.slice(1), anims.wave[2]], 6, false, retreat)
+    play([...anims.wave.slice(1), anims.wave[2]], 5, false, idle)
   }
   const summon = () => {
     if (!hidden) return
     hidden = false
+    errand = null
     later(null)
     stage.classList.remove('is-hidden')
     save()
@@ -582,10 +621,10 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
         act('wave')
         play(pingpong(anims.wave), 5, false, idle)
       })
-    // On her way to hide she turns back; hidden, she ducks in and runs out from behind the edge.
+    // On her way to hide she turns back; hidden, she ducks in and walks out from behind the edge.
     if (mode !== 'hidden') return home()
     peekTo(0, 260, () => {
-      x = behind(anims.dragRight)
+      x = behind(anims.walk, true)
       home()
     })
   }
@@ -614,7 +653,9 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     return { vx: (lastSample.x - first.x) / dt, vy: (lastSample.y - first.y) / dt }
   }
   hit.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || (mode !== 'stand' && mode !== 'fall')) return
+    if (event.button !== 0) return
+    if (mode === 'travel' && reachable()) pause()
+    if (mode !== 'stand' && mode !== 'fall') return
     event.preventDefault()
     hit.setPointerCapture(event.pointerId)
     if (mode === 'fall') {
@@ -627,7 +668,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   })
   hit.addEventListener('pointermove', (event) => {
     if (!press) {
-      if (mode !== 'stand') return
+      if (mode !== 'stand' && mode !== 'travel') return
       const head = overHead(event)
       hit.classList.toggle('is-head', head)
       if (head) rub(event.clientX)
@@ -640,6 +681,15 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     if (mode !== 'drag') {
       if (Math.hypot(event.clientX - press.sx, event.clientY - press.sy) < 5) return
       mode = 'drag'
+      // Carried off, she gives up where she was going; on her way to hide, she stays out.
+      if (errand) {
+        errand = null
+        if (hidden) {
+          hidden = false
+          save()
+        }
+      }
+      stage.classList.remove('is-clipping')
       stop()
       window.clearInterval(patTimer)
       act('idle')
@@ -667,7 +717,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     if (mode !== 'drag') {
       // Caught in the air and let go again: she falls on.
       if (y < floor() - 0.5) return drop(0, 0)
-      if (cancelled) return
+      if (cancelled) return void (errand && idle())
       return head ? cheer(1200) : poke()
     }
     // Dropped on the menu: once down, she goes to hide behind its edge.

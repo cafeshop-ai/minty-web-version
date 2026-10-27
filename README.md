@@ -4,7 +4,7 @@ Minty is the mint-haired Café Shop maid from the banner, as a small pet that li
 She is the web counterpart of the [Codex desktop pet](https://github.com/cafeshop-ai/minty): the same drawings,
 re-cut for a page where she must stay out of the way.
 
-<img src="preview.gif" width="360" alt="Minty notices the pointer, gets a head pat, waves, is carried and dropped, then runs behind the menu, peeks out and comes back">
+<img src="preview.gif" width="360" alt="Minty notices the pointer, gets a head pat, waves, is carried and dropped, then walks behind the menu, peeks out and walks back">
 
 - **Small:** about 33 x 57 CSS px on screen. Only a narrow pill over her body takes the pointer; the page around her
   stays clickable.
@@ -12,10 +12,10 @@ re-cut for a page where she must stay out of the way.
 
   | File | Size |
   | --- | --- |
-  | Atlas (`minty.avif`, 540x588, 29 frames) | 76 KB |
-  | WebP fallback, only for browsers without AVIF | 86 KB |
-  | Script | 4.8 KB gzipped |
-  | Styles | 1.4 KB gzipped |
+  | Atlas (`minty.avif`, 588x596, 35 frames) | 92 KB |
+  | WebP fallback, only for browsers without AVIF | 102 KB |
+  | Script | 5.0 KB gzipped |
+  | Styles | 1.5 KB gzipped |
 
   No dependencies, no canvas or WebGL. Nothing animates frame by frame while she stands still, except an
   occasional blink.
@@ -31,13 +31,16 @@ re-cut for a page where she must stay out of the way.
 | Click her five times in a row | Crouches and sobs for a moment; a pat cheers her up sooner |
 | Drag her | Struggles, facing the way you pull, and swings with the speed |
 | Let go or throw | Falls, bounces off the window sides, slides to a stop; a hard landing leaves her dizzy. Landed over the menu, she steps out beside it |
-| Drop her on the menu | Lands, steps out beside it and runs behind its edge to hide |
+| Drop her on the menu | Lands, steps out beside it and walks behind its edge to hide |
 | Leave her alone | Blinks and breathes, and now and then smiles, waves or works on a laptop. After 90 s without input she dozes off |
-| Click the small button over her head | Waves goodbye and runs behind the menu edge. Out of sight, she turns round and slowly leans out until half her face and her bow show |
-| Hover or click the peek | She leans out further and smiles; a click makes her duck in and run back out to where she stood |
+| Click the small button over her head | Waves goodbye and walks behind the menu edge, carrying a cup of coffee. Out of sight, she turns round and slowly leans out until half her face and her bow show |
+| Hover or click the peek | She leans out further and smiles; a click makes her duck in and walk back out to where she stood |
+| Click, pat or hold her while she walks | She stops, reacts, then walks on. Carry her off and she gives up the errand: on her way to hide, she stays out |
 
-She never jumps from place to place: every run speeds up and slows down, at about 140 px/s, and each lean eases in
-and out. Poses change at an unhurried pace, from 130 ms a frame for running to 400 ms for sobbing.
+She never jumps from place to place. She walks at an unhurried 45 px/s, easing into her first step and out of her
+last, with her steps following the floor; a long way, she walks briskly, so no walk takes more than 6 s. Each lean
+eases in and out, and poses change at a calm pace, from 120 ms a frame for walking to 400 ms for sobbing. Being carried
+or thrown has its own leaping frames.
 
 The state (hidden, and where she stood) goes to `onChange`, so a page can keep it. With
 `prefers-reduced-motion`, pass `reducedMotion: true`. She then has no breathing, blinking, idles, particles or
@@ -74,13 +77,16 @@ above a sidebar at 40, below popovers and dialogs. Change it with `zIndex`.
 `scripts/build-atlas.mjs` builds `dist/` from `spritesheet.webp` of
 [cafeshop-ai/minty](https://github.com/cafeshop-ai/minty) at `dbab7c6b`. The script checks its SHA-256 first.
 
-1. **Pick:** 29 of the source's 69 frames. Breathing and hops are drawn in code instead, and near-duplicate frames
-   are dropped. The look directions (rows 9 and 10) and the coffee walk (row 6) are left out: they draw her with a
-   smaller head on a longer body, so she would change size whenever she used them.
+1. **Pick:** 35 of the source's 69 frames. Breathing and bobbing are drawn in code instead, and near-duplicate
+   frames are dropped. The look directions (rows 9 and 10) are left out: they draw her with a smaller head on a
+   longer body. The drag rows (1 and 2) are one leaping pose, used for being carried and thrown. The walk is row 6,
+   her only walk cycle, carrying coffee; it heads left and is mirrored to head right.
 2. **Crop:** each frame to its own outline, keeping the point between her feet as its anchor.
 3. **Scale:** each frame to the same head size, for 56 CSS px at 2x. The source draws some poses smaller than idle
    (head pats and sulks by about a ninth). `scripts/measure-heads.mjs` measures the front-facing rows. The drag
-   rows lean too far for it and were measured by hand.
+   rows lean too far for it and were measured by hand. The walk is the exception: its head is drawn about 13%
+   smaller at the same height, so it is scaled to her standing height. Matched by the head, she would grow as she
+   walked.
    ![Her poses at one head size, on the light and dark console](preview.webp)
 4. **Pack:** the frames into one sheet with 4 px gutters.
 5. **Encode:** AVIF q48 (4:2:0), plus a WebP fallback. A 128-colour palette was smaller, but it lost her amber

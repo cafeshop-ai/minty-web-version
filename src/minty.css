@@ -34,6 +34,8 @@
   position: absolute;
   top: 0;
   left: 0;
+  /* Mirrored frames turn about her feet, which the frame's translate puts at this corner. */
+  transform-origin: 0 0;
   background-repeat: no-repeat;
   /* A soft contact shadow keeps her on the floor in both themes. */
   filter: drop-shadow(0 1px 1px rgb(40 26 12 / 0.28));
