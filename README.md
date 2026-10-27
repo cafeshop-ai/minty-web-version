@@ -14,8 +14,8 @@ re-cut for a page where she must stay out of the way.
   | --- | --- |
   | Atlas (`minty.avif`, 540x588, 29 frames) | 76 KB |
   | WebP fallback, only for browsers without AVIF | 86 KB |
-  | Script | 4.5 KB gzipped |
-  | Styles | 1.5 KB gzipped |
+  | Script | 4.8 KB gzipped |
+  | Styles | 1.4 KB gzipped |
 
   No dependencies, no canvas or WebGL. Nothing animates frame by frame while she stands still, except an
   occasional blink.
@@ -30,11 +30,14 @@ re-cut for a page where she must stay out of the way.
 | Click her body | Waves |
 | Click her five times in a row | Crouches and sobs for a moment; a pat cheers her up sooner |
 | Drag her | Struggles, facing the way you pull, and swings with the speed |
-| Let go or throw | Falls, bounces off the sides, slides to a stop; a hard landing leaves her dizzy |
-| Drop her on the menu | Tucks herself away behind it |
+| Let go or throw | Falls, bounces off the window sides, slides to a stop; a hard landing leaves her dizzy. Landed over the menu, she steps out beside it |
+| Drop her on the menu | Lands, steps out beside it and runs behind its edge to hide |
 | Leave her alone | Blinks and breathes, and now and then smiles, waves or works on a laptop. After 90 s without input she dozes off |
-| Click the small button over her head | Waves goodbye, runs to the menu edge in little hops and hides behind it; half her face and her bow peek out |
-| Hover or click the peek | She leans out further and smiles; a click brings her back to where she stood |
+| Click the small button over her head | Waves goodbye and runs behind the menu edge. Out of sight, she turns round and slowly leans out until half her face and her bow show |
+| Hover or click the peek | She leans out further and smiles; a click makes her duck in and run back out to where she stood |
+
+She never jumps from place to place: every run speeds up and slows down, at about 140 px/s, and each lean eases in
+and out. Poses change at an unhurried pace, from 130 ms a frame for running to 400 ms for sobbing.
 
 The state (hidden, and where she stood) goes to `onChange`, so a page can keep it. With
 `prefers-reduced-motion`, pass `reducedMotion: true`. She then has no breathing, blinking, idles, particles or

@@ -9,7 +9,7 @@
   z-index: 45;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.45s ease;
   contain: layout style;
 }
 .minty.is-ready {
@@ -110,7 +110,7 @@
 .minty-puff {
   position: absolute;
   pointer-events: none;
-  animation: minty-float 1.1s ease-out forwards;
+  animation: minty-float 1.5s ease-out forwards;
 }
 .minty-puff.is-heart svg {
   display: block;
@@ -123,7 +123,7 @@
   color: #8fb9c2;
   font: 600 10px/1 system-ui, sans-serif;
   text-shadow: 0 0 2px rgb(255 255 255 / 0.8);
-  animation-duration: 2.2s;
+  animation-duration: 2.8s;
 }
 @keyframes minty-float {
   from {
@@ -139,16 +139,16 @@
   }
 }
 .minty-pose.is-breathing {
-  animation: minty-breathe 3.4s ease-in-out infinite;
+  animation: minty-breathe 3.8s ease-in-out infinite;
 }
 .minty-pose.is-dozing {
   animation: minty-doze 3.2s ease-in-out infinite;
 }
 .minty-pose.is-landing {
-  animation: minty-land 0.24s ease-out;
+  animation: minty-land 0.32s ease-out;
 }
 .minty-pose.is-dizzy {
-  animation: minty-dizzy 0.5s ease-in-out 2;
+  animation: minty-dizzy 0.7s ease-in-out 2;
 }
 @keyframes minty-breathe {
   50% {
