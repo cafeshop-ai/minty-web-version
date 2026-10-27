@@ -1,13 +1,13 @@
 // Minty, a small mouse-driven web pet. No dependencies: one atlas, a few DOM nodes and timers.
 //
 // She stands on the bottom of the window beside a "menu edge" (any vertical line the page names, usually a
-// sidebar). She turns towards the pointer, loves head pats (rub or click her head), waves when poked and sulks
+// sidebar). She notices the pointer, loves head pats (rub or click her head), waves when poked and sulks
 // when poked too often, struggles when dragged, falls and bounces when dropped or thrown, and fills quiet moments
 // with small idles. Hidden, she tucks behind the menu edge and peeks out; a click on the peek, or summon(),
 // brings her back. Timers stop while the tab is in the background, and the frame loop runs only while she moves.
 
 export type MintyFrame = [x: number, y: number, w: number, h: number, ax: number, ay: number]
-export type MintyAnim = 'idle' | 'blink' | 'smile' | 'look' | 'pat' | 'wave' | 'dragRight' | 'dragLeft' | 'sulk' | 'happy' | 'laptop' | 'coffee'
+export type MintyAnim = 'idle' | 'blink' | 'smile' | 'notice' | 'pat' | 'wave' | 'dragRight' | 'dragLeft' | 'sulk' | 'happy' | 'laptop'
 export interface MintyManifest {
   version: 1
   /** Atlas pixels per CSS pixel. */
@@ -54,7 +54,8 @@ const AVIF_PROBE =
 const FLOOR = 6 // gap between her feet and the bottom of the window
 const SIDE = 18 // half her standing width, plus a little air
 const HEAD = 0.42 // the top share of her height that counts as her head
-const NEAR = 300 // she turns to a pointer closer than this
+const NEAR = 200 // she notices a pointer closer than this
+const PEEK = 8 // hidden, how far her tucked outline reaches past the edge before she leans out
 const GRAVITY = 2600
 const NAP = 90_000 // no input for this long and she dozes off
 
@@ -177,13 +178,12 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   }
 
   type Mode = 'stand' | 'drag' | 'fall' | 'travel' | 'hidden'
-  type Activity = 'idle' | 'look' | 'pat' | 'happy' | 'wave' | 'sulk' | 'laptop' | 'coffee' | 'doze' | 'smile'
+  type Activity = 'idle' | 'notice' | 'pat' | 'happy' | 'wave' | 'sulk' | 'laptop' | 'doze' | 'smile'
   let mode: Mode = 'stand',
     activity: Activity = 'idle',
     hidden = !!options.state?.hidden,
     rest = options.state?.x ?? 0,
     lastInput = performance.now(),
-    lastCoffee = performance.now(),
     paused = document.visibilityState !== 'visible'
   const poseClass = (name: string, on: boolean) => pose.classList.toggle(name, on && !calm)
   const save = () => options.onChange?.({ hidden, x: rest })
@@ -213,7 +213,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     activity = now
     later(null)
     poseClass('is-dozing', false)
-    poseClass('is-breathing', now === 'idle' || now === 'look' || now === 'happy' || now === 'smile')
+    poseClass('is-breathing', now === 'idle' || now === 'notice' || now === 'happy' || now === 'smile')
   }
   const idle = () => {
     stop()
@@ -224,8 +224,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   }
   function fidget() {
     if (activity !== 'idle' || !standing()) return scheduleIdle()
-    const roll = Math.random(),
-      now = performance.now()
+    const roll = Math.random()
     if (roll < 0.3) {
       act('smile')
       show(anims.smile[0])
@@ -236,14 +235,6 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     } else if (roll < 0.78) {
       act('laptop')
       play(anims.laptop, 4, 4200, idle)
-    } else if (now - lastCoffee > 15 * 60_000) {
-      // At most every quarter of an hour, she brings a coffee and holds it out for a while.
-      lastCoffee = now
-      act('coffee')
-      play(anims.coffee, 6, 2600, () => {
-        show(anims.coffee[0])
-        later(idle, 5000)
-      })
     } else {
       act('wave')
       play(pingpong(anims.wave), 7, 1300, idle)
@@ -263,29 +254,20 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     body.append(particle)
   }
 
-  // Turning to the pointer: eight directions clockwise from up, kept until the pointer is clearly in another.
-  let facing = -1
-  const lookAt = (px: number, py: number) => {
-    const dx = px - x,
-      dy = py - (y - 44),
-      distance = Math.hypot(dx, dy)
-    if (distance > NEAR || distance < 18) {
-      if (activity === 'look') later(idle, distance < 18 ? 0 : 500)
+  // A pointer close by: wide eyes, and a smile while it is over her. She settles again once it leaves or rests.
+  const notice = (px: number, py: number) => {
+    const distance = Math.hypot(px - x, py - (y - 30))
+    if (distance > NEAR) {
+      if (activity === 'notice') later(idle, 500)
       return
     }
-    const angle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360
-    let direction = Math.round(angle / 45) % 8
-    if (facing >= 0 && direction !== facing && Math.abs(((angle - facing * 45 + 540) % 360) - 180) < 30) direction = facing
-    facing = direction
-    if (activity !== 'look') {
+    if (activity !== 'notice') {
       stop()
-      act('look')
+      window.clearTimeout(blinkTimer)
+      act('notice')
     }
-    show(anims.look[direction])
-    later(() => {
-      facing = -1
-      idle()
-    }, 1600)
+    show(distance < 34 ? anims.smile[0] : anims.notice[0])
+    later(idle, 1600)
   }
 
   // Head pats: rub back and forth over her head, or click it. A pat also ends a sulk early.
@@ -440,9 +422,11 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
       duration = calm ? 0 : clamp(distance / 0.6, 260, 1400),
       hops = Math.max(1, Math.round(distance / 70)),
       start = performance.now()
-    show(anims.look[target > from ? 2 : 6])
+    const run = target > from ? anims.dragRight : anims.dragLeft
+    show(run[1])
     const step = (now: number) => {
       const t = duration ? Math.min(1, (now - start) / duration) : 1
+      if (!calm) show(run[Math.floor(Math.max(0, now - start) / 110) % run.length])
       x = from + (target - from) * (1 - (1 - t) ** 2)
       hopY = calm ? 0 : -Math.abs(Math.sin(t * hops * Math.PI)) * 9
       place()
@@ -455,10 +439,10 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     raf = requestAnimationFrame(step)
   }
 
-  // Hidden: she stands behind the edge in profile, her front just at it, and leans out so only her face shows.
-  // The peek button covers that face.
-  const profile = manifest.frames[anims.look[2]]
-  const tucked = () => edge - (profile[2] - profile[4]) / d
+  // Hidden: she stands behind the edge, her outline just past it, and leans out so half her face and the bow show.
+  // The peek button covers them; she smiles while the pointer is on it.
+  const peekFrame = manifest.frames[anims.idle[0]]
+  const tucked = () => edge - (peekFrame[2] - peekFrame[4]) / d + PEEK
   let lean = 13
   const dock = () => {
     halt()
@@ -471,7 +455,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     activity = 'idle'
     stage.classList.add('is-hidden', 'is-clipping')
     poseClass('is-breathing', false)
-    show(anims.look[2])
+    show(anims.idle[0])
     x = tucked()
     y = floor()
     tilt = calm ? 0 : lean
@@ -506,7 +490,9 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   }
   const leanOut = (more: boolean) => {
     lean = more ? 20 : 13
-    if (mode !== 'hidden' || calm) return
+    if (mode !== 'hidden') return
+    show(more ? anims.smile[0] : anims.idle[0])
+    if (calm) return
     tilt = lean
     place()
   }
@@ -610,7 +596,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
 
   const onMove = (event: PointerEvent) => {
     wake()
-    if (!calm && standing() && (activity === 'idle' || activity === 'look')) lookAt(event.clientX, event.clientY)
+    if (!calm && standing() && (activity === 'idle' || activity === 'notice')) notice(event.clientX, event.clientY)
   }
   const onInput = () => wake()
   const onVisibility = () => {

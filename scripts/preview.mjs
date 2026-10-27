@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import sharp from 'sharp'
 
 const manifest = JSON.parse(readFileSync('dist/minty.json', 'utf8'))
-const picks = [['idle', 0], ['look', 2], ['look', 7], ['pat', 2], ['happy', 0], ['wave', 2], ['dragRight', 1], ['sulk', 3], ['laptop', 0], ['coffee', 1]]
+const picks = [['idle', 0], ['notice', 0], ['dragLeft', 1], ['pat', 2], ['happy', 0], ['wave', 2], ['dragRight', 1], ['sulk', 3], ['laptop', 0], ['smile', 0]]
 const sheet = sharp('dist/minty.webp')
 const sheetBuffer = await sheet.png().toBuffer()
 const gap = 28, pad = 24, rowHeight = 150
