@@ -83,6 +83,9 @@
   width: 10px;
   height: 10px;
 }
+.minty-hide.is-right svg {
+  transform: scaleX(-1);
+}
 .minty-body:hover .minty-hide,
 .minty-hide:focus-visible {
   opacity: 1;
@@ -108,6 +111,9 @@
 }
 .minty.is-hidden .minty-peek {
   display: block;
+}
+.minty.is-right .minty-peek {
+  border-radius: 10px 0 0 10px;
 }
 .minty-puff {
   position: absolute;

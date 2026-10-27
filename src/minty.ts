@@ -3,10 +3,10 @@
 // She stands on the bottom of the window beside a "menu edge" (any vertical line the page names, usually a
 // sidebar). She notices the pointer, loves head pats (rub or click her head), waves when poked and sulks
 // when poked too often, struggles when dragged, falls and bounces when dropped or thrown, and fills quiet moments
-// with small idles. Hidden, she walks behind the menu edge and peeks out; a click on the peek, or summon(), makes her
-// duck in and walk back out. Every move between places eases in and out; she never jumps, and a click or a pat
-// stops her on the way. Timers stop while the tab
-// is in the background, and the frame loop runs only while she moves.
+// with small idles. Hidden, she walks behind the menu edge or the right side of the window, whichever is nearer, and
+// peeks out; a click on the peek, or summon(), makes her duck in and walk back out. Every move between places eases
+// in and out; she never jumps, and a click or a pat stops her on the way. Timers stop while the tab is in the
+// background, and the frame loop runs only while she moves.
 
 export type MintyFrame = [x: number, y: number, w: number, h: number, ax: number, ay: number]
 export type MintyAnim = 'idle' | 'blink' | 'smile' | 'notice' | 'pat' | 'wave' | 'walk' | 'dragRight' | 'dragLeft' | 'sulk' | 'happy' | 'laptop'
@@ -22,11 +22,14 @@ export interface MintyState {
   hidden: boolean
   /** Her place on the floor, as a fraction of the window width. */
   x: number
+  /** Where she hides: behind the menu edge, or behind the right side of the window, whichever is nearer to her. */
+  side?: 'left' | 'right'
 }
 export interface MintyOptions {
   sheet: { avif?: string; webp: string }
   manifest: MintyManifest
-  /** The x of the edge she hides behind, in viewport pixels; asked again on relayout(). Default 0, the window edge. */
+  /** The x of the menu edge, in viewport pixels; asked again on relayout(). Default 0, the window edge. She hides behind
+   *  it or behind the right side of the window, whichever is nearer. */
   edge?: () => number
   labels?: { hide?: string; summon?: string }
   /** Where she was last time; by default she stands beside the edge. */
@@ -44,7 +47,7 @@ export interface Minty {
   readonly hidden: boolean
   hide(): void
   summon(): void
-  /** Call when the edge moved or the layout changed; window resizes are handled already. */
+  /** Call when the edge moved or the layout changed; window resizes and page scrollbars are handled already. */
   relayout(): void
   destroy(): void
 }
@@ -133,9 +136,11 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     hopY = 0,
     tilt = 0,
     origin = '0px 0px'
+  // The window's width without a page scrollbar, the right side of her layer.
+  const width = () => document.documentElement.clientWidth || window.innerWidth
   const floor = () => window.innerHeight - FLOOR,
     left = () => edge + SIDE,
-    right = () => window.innerWidth - SIDE
+    right = () => width() - SIDE
   const place = () => {
     stage.style.left = `${edge}px`
     body.style.transformOrigin = origin
@@ -202,10 +207,11 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     activity: Activity = 'idle',
     hidden = !!options.state?.hidden,
     rest = options.state?.x ?? 0,
+    side: 'left' | 'right' = options.state?.side === 'right' ? 'right' : 'left',
     lastInput = performance.now(),
     paused = document.visibilityState !== 'visible'
   const poseClass = (name: string, on: boolean) => pose.classList.toggle(name, on && !calm)
-  const save = () => options.onChange?.({ hidden, x: rest })
+  const save = () => options.onChange?.({ hidden, x: rest, side })
   const standing = () => mode === 'stand' && !paused
 
   // Blinks and small idles while nothing else happens.
@@ -439,14 +445,18 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     pose.classList.remove('is-landing')
     void pose.offsetWidth
     poseClass('is-landing', true)
-    // Dropped on the menu she goes to hide; down over it or past the window side, she steps back to her floor.
-    if (hidden) return retreat()
-    if (x < left() || x > right()) return travel(clamp(x, left(), right()), () => settle(false))
+    // Dropped on the menu she goes to hide; down over it or past the window side, she steps back to her floor. Either
+    // way she first finds her feet.
+    if (hidden || x < left() || x > right()) {
+      errand = hidden ? retreat : () => travel(clamp(x, left(), right()), () => settle(false))
+      show(anims.idle[0])
+      return later(idle, calm ? 0 : 450)
+    }
     settle(hard)
   }
   const settle = (hard: boolean) => {
     mode = 'stand'
-    rest = x / window.innerWidth
+    rest = x / width()
     save()
     if (!hard || calm) return idle()
     // A hard landing: a dizzy crouch.
@@ -511,8 +521,8 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     raf = requestAnimationFrame(step)
   }
   // A press while she walks stops her where she is. She carries on once she has reacted (see `idle`), or gives up
-  // if carried off. Half behind the edge she is out of reach.
-  const reachable = () => !(stage.classList.contains('is-clipping') && x < left())
+  // if carried off. Half behind an edge she is out of reach.
+  const reachable = () => !(stage.classList.contains('is-clipping') && (x < left() || x > right()))
   const pause = () => {
     halt()
     errand = walking
@@ -523,24 +533,28 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     place()
   }
 
-  // Hidden: she stands behind the edge in her idle pose. `out` is how far she leans out, from 0, out of sight, to 1,
-  // where her outline reaches PEEK past the edge and she leans so half her face and the bow show. It always eases,
-  // so she ducks in and peeks out rather than jumping. The peek button covers her face; she smiles while it is hovered.
+  // Hidden: she stands behind the menu edge, or behind the right side of the window, in her idle pose; on the right
+  // she is mirrored. `out` is how far she leans out, from 0, out of sight, to 1, where her outline reaches PEEK past
+  // the edge and she leans so half her face and the bow show. It always eases, so she ducks in and peeks out rather
+  // than jumping. The peek button covers her face; she smiles while it is hovered.
+  const nearest = () => (x - edge <= width() - x ? 'left' : 'right')
   // How far frames, drawn as they are or mirrored, reach right of her feet, and where she stands with them just out of
-  // sight behind the edge:
+  // sight behind the edge of her side:
   const reach = (frames: number[], mirror: boolean) =>
     Math.max(...frames.map((i) => (mirror ? manifest.frames[i][4] : manifest.frames[i][2] - manifest.frames[i][4]) / d))
-  const behind = (frames: number[], mirror = false) => edge - reach(frames, mirror) - 3
+  const behind = (frames: number[], mirror = false) =>
+    side === 'left' ? edge - reach(frames, mirror) - 3 : width() + reach(frames, !mirror) + 3
   let out = 0,
     lean = 13,
     leanTo = 13
   const tucked = () => {
-    x = behind(anims.idle) + (PEEK + 3) * out
+    const dir = side === 'left' ? 1 : -1
+    x = behind(anims.idle, side === 'right') + dir * (PEEK + 3) * out
     y = floor()
-    tilt = calm ? 0 : lean * out
+    tilt = calm ? 0 : dir * lean * out
     origin = '0px 0px'
     place()
-    peek.style.transform = `translate(0, ${floor() - 62}px)`
+    peek.style.transform = `translate(${side === 'left' ? 0 : width() - edge - 18}px, ${floor() - 62}px)`
   }
   const peekTo = (to: number, ms: number, then?: () => void) => {
     halt()
@@ -571,8 +585,9 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     mode = 'hidden'
     activity = 'idle'
     stage.classList.add('is-hidden', 'is-clipping')
+    stage.classList.toggle('is-right', side === 'right')
     poseClass('is-breathing', false)
-    show(leanTo > 13 ? anims.smile[0] : anims.idle[0])
+    show(leanTo > 13 ? anims.smile[0] : anims.idle[0], side === 'right')
     out = at
     lean = leanTo
     tucked()
@@ -582,11 +597,13 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     dock(calm ? 1 : 0)
     if (!calm) later(() => peekTo(1, 650), 300)
   }
-  // To hide she walks behind the edge; from over the menu she first steps out beside it.
+  // To hide she walks behind the nearer edge; from over the menu she first steps out beside it.
   const retreat = () => {
-    if (!stage.classList.contains('is-clipping') && x < left()) return travel(left(), retreat)
+    side = nearest()
+    save()
+    if (side === 'left' && !stage.classList.contains('is-clipping') && x < left()) return travel(left(), retreat)
     stage.classList.add('is-clipping')
-    travel(behind(anims.walk), duck)
+    travel(behind(anims.walk, side === 'right'), duck)
   }
   const hide = () => {
     if (hidden) return
@@ -615,7 +632,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     save()
     if (mode === 'drag' || mode === 'fall') return
     const home = () =>
-      travel(clamp(rest * window.innerWidth, left(), right()), () => {
+      travel(clamp(rest * width(), left(), right()), () => {
         stage.classList.remove('is-clipping')
         mode = 'stand'
         act('wave')
@@ -624,7 +641,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     // On her way to hide she turns back; hidden, she ducks in and walks out from behind the edge.
     if (mode !== 'hidden') return home()
     peekTo(0, 260, () => {
-      x = behind(anims.walk, true)
+      x = behind(anims.walk, side === 'left')
       home()
     })
   }
@@ -632,7 +649,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     leanTo = more ? 20 : 13
     if (mode !== 'hidden' || !hidden) return
     later(null)
-    show(more ? anims.smile[0] : anims.idle[0])
+    show(more ? anims.smile[0] : anims.idle[0], side === 'right')
     peekTo(1, 220 + 430 * (1 - out))
   }
 
@@ -731,6 +748,10 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   hit.addEventListener('pointerup', (event) => release(event, false))
   hit.addEventListener('pointercancel', (event) => release(event, true))
   hit.addEventListener('pointerleave', () => hit.classList.remove('is-head'))
+  // The button's arrow points to the side she would hide on.
+  const aim = () => hideButton.classList.toggle('is-right', nearest() === 'right')
+  hit.addEventListener('pointerenter', aim)
+  hideButton.addEventListener('focus', aim)
   hideButton.addEventListener('click', hide)
   peek.addEventListener('click', summon)
   peek.addEventListener('pointerenter', () => leanOut(true))
@@ -756,7 +777,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     if (mode === 'stand' || mode === 'drag') return
     halt()
     stage.classList.remove('is-clipping')
-    x = clamp(mode === 'fall' ? x : mode === 'travel' ? goal : rest * window.innerWidth, left(), right())
+    x = clamp(mode === 'fall' ? x : mode === 'travel' ? goal : rest * width(), left(), right())
     land(false)
   }
   function relayout() {
@@ -772,13 +793,16 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   window.addEventListener('keydown', onInput, { passive: true })
   window.addEventListener('wheel', onInput, { passive: true })
   window.addEventListener('resize', relayout)
+  // A page scrollbar that comes or goes changes the width she uses without a resize event.
+  const page = new ResizeObserver(() => relayout())
+  page.observe(document.documentElement)
   document.addEventListener('visibilitychange', onVisibility)
 
   // First appearance.
   y = floor()
   if (hidden) dock(1)
   else {
-    x = clamp(rest * window.innerWidth, left(), right())
+    x = clamp(rest * width(), left(), right())
     place()
     idle()
   }
@@ -803,6 +827,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
       window.removeEventListener('keydown', onInput)
       window.removeEventListener('wheel', onInput)
       window.removeEventListener('resize', relayout)
+      page.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
       stage.remove()
     },

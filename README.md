@@ -14,7 +14,7 @@ re-cut for a page where she must stay out of the way.
   | --- | --- |
   | Atlas (`minty.avif`, 588x596, 35 frames) | 92 KB |
   | WebP fallback, only for browsers without AVIF | 102 KB |
-  | Script | 5.0 KB gzipped |
+  | Script | 5.2 KB gzipped |
   | Styles | 1.5 KB gzipped |
 
   No dependencies, no canvas or WebGL. Nothing animates frame by frame while she stands still, except an
@@ -31,9 +31,9 @@ re-cut for a page where she must stay out of the way.
 | Click her five times in a row | Crouches and sobs for a moment; a pat cheers her up sooner |
 | Drag her | Struggles, facing the way you pull, and swings with the speed |
 | Let go or throw | Falls, bounces off the window sides, slides to a stop; a hard landing leaves her dizzy. Landed over the menu, she steps out beside it |
-| Drop her on the menu | Lands, steps out beside it and walks behind its edge to hide |
+| Drop her on the menu | Lands, finds her feet, steps out beside it and walks behind its edge to hide |
 | Leave her alone | Blinks and breathes, and now and then smiles, waves or works on a laptop. After 90 s without input she dozes off |
-| Click the small button over her head | Waves goodbye and walks behind the menu edge, carrying a cup of coffee. Out of sight, she turns round and slowly leans out until half her face and her bow show |
+| Click the small button over her head | Waves goodbye and walks, carrying a cup of coffee, behind the menu edge or the right side of the window, whichever is nearer; the button's arrow shows which. Out of sight, she turns round and slowly leans out until half her face and her bow show |
 | Hover or click the peek | She leans out further and smiles; a click makes her duck in and walk back out to where she stood |
 | Click, pat or hold her while she walks | She stops, reacts, then walks on. Carry her off and she gives up the errand: on her way to hide, she stays out |
 
@@ -42,7 +42,7 @@ last, with her steps following the floor; a long way, she walks briskly, so no w
 eases in and out, and poses change at a calm pace, from 120 ms a frame for walking to 400 ms for sobbing. Being carried
 or thrown has its own leaping frames.
 
-The state (hidden, and where she stood) goes to `onChange`, so a page can keep it. With
+The state (hidden, where she stood, and the side she hides on) goes to `onChange`, so a page can keep it. With
 `prefers-reduced-motion`, pass `reducedMotion: true`. She then has no breathing, blinking, idles, particles or
 flights, and changes pose only when you act.
 
@@ -56,7 +56,7 @@ import manifest from './dist/minty.json'
 const minty = await createMinty({
   sheet: { avif: '/minty.avif', webp: '/minty.webp' },
   manifest,
-  edge: () => document.querySelector('nav')!.getBoundingClientRect().right, // the line she hides behind
+  edge: () => document.querySelector('nav')!.getBoundingClientRect().right, // the menu edge; she also hides at the right
   state: JSON.parse(localStorage.getItem('minty') || '{}'),
   reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
   onChange: (state) => localStorage.setItem('minty', JSON.stringify(state)),
