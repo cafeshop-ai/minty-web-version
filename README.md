@@ -4,7 +4,7 @@ Minty is the mint-haired Café Shop maid from the banner, as a small pet that li
 She is the web counterpart of the [Codex desktop pet](https://github.com/cafeshop-ai/minty): the same drawings,
 re-cut for a page where she must stay out of the way.
 
-![Minty's poses on the light and dark console](preview.webp)
+<img src="preview.gif" width="360" alt="Minty notices the pointer, gets a head pat, waves, is carried and dropped, then runs behind the menu, peeks out and comes back">
 
 - **Small:** about 33 x 57 CSS px on screen. Only a narrow pill over her body takes the pointer; the page around her
   stays clickable.
@@ -14,7 +14,7 @@ re-cut for a page where she must stay out of the way.
   | --- | --- |
   | Atlas (`minty.avif`, 540x588, 29 frames) | 76 KB |
   | WebP fallback, only for browsers without AVIF | 86 KB |
-  | Script | 4.4 KB gzipped |
+  | Script | 4.5 KB gzipped |
   | Styles | 1.5 KB gzipped |
 
   No dependencies, no canvas or WebGL. Nothing animates frame by frame while she stands still, except an
@@ -78,6 +78,7 @@ above a sidebar at 40, below popovers and dialogs. Change it with `zIndex`.
 3. **Scale:** each frame to the same head size, for 56 CSS px at 2x. The source draws some poses smaller than idle
    (head pats and sulks by about a ninth). `scripts/measure-heads.mjs` measures the front-facing rows. The drag
    rows lean too far for it and were measured by hand.
+   ![Her poses at one head size, on the light and dark console](preview.webp)
 4. **Pack:** the frames into one sheet with 4 px gutters.
 5. **Encode:** AVIF q48 (4:2:0), plus a WebP fallback. A 128-colour palette was smaller, but it lost her amber
    eyes, the blush and the brooch.
@@ -90,6 +91,8 @@ npm run build                                            # dist/minty.{js,css}
 node scripts/preview.mjs                                 # preview.webp
 npm run check                                            # tsc
 ```
+
+`preview.gif` is a recording of `dist/` driven by a scripted pointer in headless Chromium, with a drawn cursor.
 
 ## License
 

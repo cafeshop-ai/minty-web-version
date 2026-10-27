@@ -212,6 +212,8 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
   const act = (now: Activity) => {
     activity = now
     later(null)
+    // A pat that is still running would turn whatever comes next into its happy ending.
+    if (now !== 'pat') window.clearInterval(patTimer)
     poseClass('is-dozing', false)
     poseClass('is-breathing', now === 'idle' || now === 'notice' || now === 'happy' || now === 'smile')
   }
@@ -413,6 +415,7 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     later(null)
     mode = 'travel'
     activity = 'idle'
+    window.clearInterval(patTimer)
     poseClass('is-breathing', false)
     poseClass('is-dozing', false)
     tilt = 0
@@ -504,9 +507,12 @@ export async function createMinty(options: MintyOptions): Promise<Minty> {
     const rect = hit.getBoundingClientRect()
     return event.clientY < rect.top + rect.height * HEAD
   }
+  // The pointer's speed over the last 0.1 s: held still before letting go, she drops straight down.
   const velocity = (now: number) => {
-    const first = samples[0],
-      lastSample = samples[samples.length - 1],
+    const recent = samples.filter((sample) => now - sample.t < 100)
+    if (recent.length < 2) return { vx: 0, vy: 0 }
+    const first = recent[0],
+      lastSample = recent[recent.length - 1],
       dt = Math.max(16, now - first.t) / 1000
     return { vx: (lastSample.x - first.x) / dt, vy: (lastSample.y - first.y) / dt }
   }

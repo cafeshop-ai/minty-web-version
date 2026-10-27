@@ -92,6 +92,7 @@
   outline-offset: 2px;
 }
 .minty.is-dragging .minty-hide,
+.minty.is-clipping .minty-hide,
 .minty.is-hidden .minty-hide,
 .minty.is-hidden .minty-hit {
   display: none;
